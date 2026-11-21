@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Events;
@@ -9,24 +10,34 @@ public class EmergencyDialer1669 : MonoBehaviour
     [Header("Dial Settings")]
     public string targetNumber = "1669";
     public bool requirePhoneHeldFirst = true;
-    public bool completeCaseOnDial = true;
+    public float wrongNumberResetDelay = 1.0f;
 
-    [Header("Optional UI References")]
-    [Tooltip("แผงหน้าปัดโทรศัพท์ (จะเปิดเมื่อถือโทรศัพท์อยู่)")]
+    [Header("End Game Settings")]
+    [Tooltip("End game UI panel (optional) shown when 1669 is called")]
+    public GameObject endGameUI;
+
+    [Tooltip("End game label (optional)")]
+    public TMP_Text endGameText;
+
+    public string endGameMessage = "GAME OVER";
+
+    [Tooltip("Stop Play Mode or quit application after delay when completed")]
+    public bool quitOrStopPlayAfterEnd = false;
+    public float endDelayBeforeStop = 1.5f;
+
+    [Header("Phone UI References")]
     public GameObject dialPadUI;
-
-    [Tooltip("ข้อความแสดงตัวเลขที่กำลังกด (TMP)")]
     public TMP_Text dialedNumberText;
-
-    [Tooltip("ข้อความสถานะ/จบเคส (TMP)")]
     public TMP_Text statusText;
 
     [Header("Events")]
     public UnityEvent onPhonePickedUp;
+    public UnityEvent onWrongNumber;
     public UnityEvent onCaseCompleted;
 
     private readonly StringBuilder currentInput = new StringBuilder();
     private TestSimpleGrab grabSystem;
+    private Coroutine resetRoutine;
     private bool isPhoneHeld = false;
     private bool isCompleted = false;
 
@@ -41,7 +52,13 @@ public class EmergencyDialer1669 : MonoBehaviour
             dialPadUI.SetActive(false);
         }
 
-        RefreshUI("กด E เพื่อหยิบโทรศัพท์");
+        if (endGameUI != null)
+        {
+            endGameUI.SetActive(false);
+        }
+
+        RefreshNumberDisplay();
+        SetStatus("Press E to pick up phone");
     }
 
     private void Update()
@@ -56,7 +73,8 @@ public class EmergencyDialer1669 : MonoBehaviour
             {
                 dialPadUI.SetActive(true);
             }
-            RefreshUI("กดเลข 1669 เพื่อโทรขอความช่วยเหลือ");
+            RefreshNumberDisplay();
+            SetStatus($"Dial {targetNumber} and press CALL");
             onPhonePickedUp?.Invoke();
         }
         else if (!heldNow && isPhoneHeld)
@@ -71,7 +89,7 @@ public class EmergencyDialer1669 : MonoBehaviour
 
         if (requirePhoneHeldFirst && !isPhoneHeld) return;
 
-        ReadKeyboardDigits();
+        ReadKeyboardInput();
     }
 
     private bool IsHoldingThisPhone()
@@ -80,7 +98,7 @@ public class EmergencyDialer1669 : MonoBehaviour
         return grabSystem.IsHolding(transform);
     }
 
-    private void ReadKeyboardDigits()
+    private void ReadKeyboardInput()
     {
         Keyboard kb = Keyboard.current;
         if (kb == null) return;
@@ -96,72 +114,169 @@ public class EmergencyDialer1669 : MonoBehaviour
         if (kb.digit9Key.wasPressedThisFrame || kb.numpad9Key.wasPressedThisFrame) PressDigit("9");
         if (kb.digit0Key.wasPressedThisFrame || kb.numpad0Key.wasPressedThisFrame) PressDigit("0");
 
-        if (kb.backspaceKey.wasPressedThisFrame)
+        if (kb.backspaceKey.wasPressedThisFrame || kb.xKey.wasPressedThisFrame)
         {
             Backspace();
         }
+
+        if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
+        {
+            CallNumber();
+        }
     }
 
-    // เรียกจากปุ่ม UI ตัวเลข 0-9 ได้โดยตรง
+    // Called by keypad buttons 0-9
     public void PressDigit(string digit)
     {
         if (isCompleted || string.IsNullOrEmpty(digit)) return;
         if (requirePhoneHeldFirst && !isPhoneHeld) return;
 
-        currentInput.Append(digit);
-        string typed = currentInput.ToString();
-
-        if (typed == targetNumber)
+        if (resetRoutine != null)
         {
-            CompleteEmergencyCall();
-            return;
-        }
-
-        // ถ้ากดผิดลำดับเมื่อครบความยาวเบอร์เป้าหมาย ให้รีเซ็ตเริ่มกดใหม่
-        if (!targetNumber.StartsWith(typed))
-        {
+            StopCoroutine(resetRoutine);
+            resetRoutine = null;
             currentInput.Clear();
-            RefreshUI($"กดผิดลำดับ ({typed}) กรุณากด {targetNumber} ใหม่");
-            return;
         }
 
-        RefreshUI($"กำลังกดเบอร์: {typed}");
+        currentInput.Append(digit);
+        RefreshNumberDisplay();
+        SetStatus("Press CALL");
     }
 
+    // Called by CALL button
+    public void CallNumber()
+    {
+        if (isCompleted) return;
+        if (requirePhoneHeldFirst && !isPhoneHeld) return;
+
+        if (currentInput.ToString() == targetNumber)
+        {
+            CompleteGame();
+        }
+        else
+        {
+            TriggerWrongNumber();
+        }
+    }
+
+    // Called by X button (deletes 1 last digit)
     public void Backspace()
     {
-        if (isCompleted || currentInput.Length == 0) return;
-        currentInput.Length -= 1;
-        RefreshUI(currentInput.Length > 0 ? $"กำลังกดเบอร์: {currentInput}" : $"กดเลข {targetNumber}");
+        if (isCompleted) return;
+        if (requirePhoneHeldFirst && !isPhoneHeld) return;
+
+        if (resetRoutine != null)
+        {
+            StopCoroutine(resetRoutine);
+            resetRoutine = null;
+        }
+
+        if (currentInput.Length > 0)
+        {
+            currentInput.Length -= 1;
+            RefreshNumberDisplay();
+            SetStatus(currentInput.Length > 0 ? "Press CALL" : $"Dial {targetNumber} and press CALL");
+        }
+        else
+        {
+            RefreshNumberDisplay();
+            SetStatus($"Dial {targetNumber} and press CALL");
+        }
     }
 
     public void ClearNumber()
     {
+        if (resetRoutine != null)
+        {
+            StopCoroutine(resetRoutine);
+            resetRoutine = null;
+        }
+
         currentInput.Clear();
-        RefreshUI($"กดเลข {targetNumber}");
+        RefreshNumberDisplay();
+        SetStatus($"Dial {targetNumber} and press CALL");
     }
 
-    private void CompleteEmergencyCall()
+    private void TriggerWrongNumber()
+    {
+        onWrongNumber?.Invoke();
+        SetStatus("worng number");
+
+        if (resetRoutine != null)
+        {
+            StopCoroutine(resetRoutine);
+        }
+        resetRoutine = StartCoroutine(ResetAfterWrongNumber());
+    }
+
+    private IEnumerator ResetAfterWrongNumber()
+    {
+        yield return new WaitForSeconds(wrongNumberResetDelay);
+        currentInput.Clear();
+        RefreshNumberDisplay();
+        SetStatus($"Dial {targetNumber} and press CALL");
+        resetRoutine = null;
+    }
+
+    private void CompleteGame()
     {
         isCompleted = true;
-        RefreshUI($"โทร {targetNumber} สำเร็จ! จบภารกิจ Case 2");
 
-        if (completeCaseOnDial)
+        if (resetRoutine != null)
         {
-            onCaseCompleted?.Invoke();
+            StopCoroutine(resetRoutine);
+            resetRoutine = null;
+        }
+
+        if (dialedNumberText != null)
+        {
+            dialedNumberText.text = targetNumber;
+        }
+
+        SetStatus(endGameMessage);
+
+        if (endGameUI != null)
+        {
+            endGameUI.SetActive(true);
+        }
+
+        if (endGameText != null)
+        {
+            endGameText.text = endGameMessage;
+        }
+
+        onCaseCompleted?.Invoke();
+
+        if (quitOrStopPlayAfterEnd)
+        {
+            StartCoroutine(StopGameRoutine());
         }
     }
 
-    private void RefreshUI(string msg)
+    private IEnumerator StopGameRoutine()
+    {
+        yield return new WaitForSeconds(endDelayBeforeStop);
+
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    private void RefreshNumberDisplay()
     {
         if (dialedNumberText != null)
         {
             dialedNumberText.text = currentInput.Length > 0 ? currentInput.ToString() : "----";
         }
+    }
 
+    private void SetStatus(string message)
+    {
         if (statusText != null)
         {
-            statusText.text = msg;
+            statusText.text = message;
         }
     }
 }
