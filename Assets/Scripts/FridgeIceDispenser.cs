@@ -11,8 +11,11 @@ public class FridgeIceDispenser : MonoBehaviour
     [Tooltip("ลาก IceContainerSocket มาใส่ (จะเปิดใช้งานเมื่อมีน้ำแข็งแล้ว)")]
     public GameObject iceContainerSocket;
 
-    [Header("Task Link")]
+    [Header("Task Link & Sequence Guard")]
     public Case2TaskManager taskManager;
+
+    [Tooltip("ติ๊กไว้เพื่อบล็อกการกดเอาน้ำแข็งก่อนปิดเตาแก๊ส (Step 1)")]
+    public bool requireStep1BeforeFill = true;
 
     [Header("Interaction Settings")]
     public float interactRange = 4.0f;
@@ -36,7 +39,6 @@ public class FridgeIceDispenser : MonoBehaviour
             taskManager = FindAnyObjectByType<Case2TaskManager>();
         }
 
-        // เริ่มเกมให้ซ่อนน้ำแข็งในถัง (เป็นถังเปล่า) และปิดจุดแช่นิ้วไว้ก่อน
         if (iceInsideBucket != null)
             iceInsideBucket.SetActive(false);
 
@@ -55,20 +57,33 @@ public class FridgeIceDispenser : MonoBehaviour
         }
     }
 
+    private bool CanFillIceNow()
+    {
+        if (!requireStep1BeforeFill || taskManager == null)
+            return true;
+
+        return taskManager.CanPerformSteps2To5("Turn off the stove first!");
+    }
+
     private void TryGetIceFromFridge()
     {
         Ray ray = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
         if (Physics.Raycast(ray, out RaycastHit hit, interactRange))
         {
-            // เช็กว่าเล็งโดนตัวตู้เย็นหรือชิ้นส่วนลูกของตู้เย็นหรือไม่
             if (hit.transform == transform || hit.transform.IsChildOf(transform))
             {
+                if (!CanFillIceNow())
+                {
+                    onStatusMessage?.Invoke("Turn off the stove first before getting ice");
+                    return;
+                }
+
                 if (requireBucketNearFridge && iceBucketTransform != null)
                 {
                     float dist = Vector3.Distance(transform.position, iceBucketTransform.position);
                     if (dist > maxBucketDistance)
                     {
-                        onStatusMessage?.Invoke("กรุณานำถังน้ำแข็งมาใกล้ตู้เย็นก่อนกดเอาน้ำแข็ง");
+                        onStatusMessage?.Invoke("Bring the ice bucket closer to the fridge first");
                         return;
                     }
                 }
@@ -80,6 +95,14 @@ public class FridgeIceDispenser : MonoBehaviour
 
     public void FillIce()
     {
+        if (hasIce) return;
+
+        if (!CanFillIceNow())
+        {
+            onStatusMessage?.Invoke("Turn off the stove first before getting ice");
+            return;
+        }
+
         hasIce = true;
 
         if (iceInsideBucket != null)
@@ -94,7 +117,7 @@ public class FridgeIceDispenser : MonoBehaviour
         }
         taskManager?.CompleteStep4_IceInBucket();
 
-        onStatusMessage?.Invoke("เติมน้ำแข็งลงถังเรียบร้อยแล้ว");
+        onStatusMessage?.Invoke("Ice added to bucket");
         onIceFilled?.Invoke();
     }
 }

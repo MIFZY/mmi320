@@ -22,9 +22,13 @@ public class KitchenSnapSocket : MonoBehaviour
     [Header("Task Link")]
     public Case2TaskManager taskManager;
 
-    [Header("Tags")]
+    [Header("Tags & Bag Validation")]
     public string bareFingerTag = "SeveredFinger";
     public string baggedFingerTag = "BaggedFinger";
+    public string emptyBagTag = "Untagged";
+
+    [Tooltip("กันไม่ให้เอาถุงเปล่า (ที่ยังไม่มีนิ้ว) ไปล็อคแช่ในถังน้ำแข็งก่อนใส่นิ้ว")]
+    public bool requireFingerInsideBagBeforeIceSnap = true;
 
     [Header("Optional Visual Swap (e.g., Open Bag -> Sealed Bag)")]
     public GameObject openBagObject;
@@ -36,6 +40,7 @@ public class KitchenSnapSocket : MonoBehaviour
     public UnityEvent<string> onWarningMessage;
 
     private readonly HashSet<EntityId> lockedObjectIds = new HashSet<EntityId>();
+    private readonly HashSet<EntityId> fingerBaggedIds = new HashSet<EntityId>();
     private Transform activeSnappingTarget;
     private Rigidbody activeSnappingRb;
     private bool isSnappingInProgress = false;
@@ -78,6 +83,19 @@ public class KitchenSnapSocket : MonoBehaviour
         TryHandleTrigger(other);
     }
 
+    private bool SafeCompareTag(Component target, string tagName)
+    {
+        if (target == null || string.IsNullOrEmpty(tagName)) return false;
+        try
+        {
+            return target.CompareTag(tagName);
+        }
+        catch (UnityException)
+        {
+            return false;
+        }
+    }
+
     private void ZeroVelocitySafely(Rigidbody rb)
     {
         if (rb == null || rb.isKinematic) return;
@@ -98,9 +116,48 @@ public class KitchenSnapSocket : MonoBehaviour
         }
     }
 
+    private bool HasBaggedFingerInside(Transform root, Collider other)
+    {
+        if (root != null && fingerBaggedIds.Contains(root.GetEntityId()))
+        {
+            return true;
+        }
+
+        if (other != null && fingerBaggedIds.Contains(other.transform.root.GetEntityId()))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(baggedFingerTag))
+        {
+            if (SafeCompareTag(other, baggedFingerTag) || SafeCompareTag(root, baggedFingerTag))
+                return true;
+
+            Transform[] children = root.GetComponentsInChildren<Transform>(true);
+            for (int i = 0; i < children.Length; i++)
+            {
+                if (children[i] != null && children[i] != root && SafeCompareTag(children[i], baggedFingerTag))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private void TryHandleTrigger(Collider other)
     {
         if (other == null) return;
+
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
+        }
+
+        if (taskManager != null && !taskManager.CanPerformSteps2To5("Turn off the stove first!"))
+        {
+            onWarningMessage?.Invoke("Turn off the stove first!");
+            return;
+        }
 
         Rigidbody rb = other.attachedRigidbody;
         Transform targetRoot = rb != null ? rb.transform : other.transform.root;
@@ -110,20 +167,26 @@ public class KitchenSnapSocket : MonoBehaviour
 
         if (socketMode == SocketMode.ZipBagSocket)
         {
-            if (other.CompareTag(bareFingerTag) || targetRoot.CompareTag(bareFingerTag))
+            if (SafeCompareTag(other, bareFingerTag) || SafeCompareTag(targetRoot, bareFingerTag))
             {
                 BeginSnap(targetRoot, rb, isIceContainer: false);
             }
         }
         else if (socketMode == SocketMode.IceContainerSocket)
         {
-            if (other.CompareTag(baggedFingerTag) || targetRoot.CompareTag(baggedFingerTag))
+            bool hasFinger = HasBaggedFingerInside(targetRoot, other);
+
+            if (hasFinger)
             {
                 BeginSnap(targetRoot, rb, isIceContainer: true);
             }
-            else if (other.CompareTag(bareFingerTag) || targetRoot.CompareTag(bareFingerTag))
+            else if (SafeCompareTag(other, bareFingerTag) || SafeCompareTag(targetRoot, bareFingerTag))
             {
-                onWarningMessage?.Invoke("กรุณาใส่นิ้วลงในถุงซิปก่อนนำไปแช่ในถังน้ำแข็ง");
+                onWarningMessage?.Invoke("Put the severed finger in the bag before soaking in ice!");
+            }
+            else if (requireFingerInsideBagBeforeIceSnap)
+            {
+                onWarningMessage?.Invoke("Put the severed finger in the bag first before placing it in the ice bucket!");
             }
         }
     }
@@ -211,9 +274,15 @@ public class KitchenSnapSocket : MonoBehaviour
 
         if (!isIceContainer)
         {
+            fingerBaggedIds.Add(targetRoot.GetEntityId());
+
             if (!string.IsNullOrEmpty(baggedFingerTag))
             {
-                targetRoot.tag = baggedFingerTag;
+                try
+                {
+                    targetRoot.tag = baggedFingerTag;
+                }
+                catch (UnityException) { }
             }
 
             if (openBagObject != null) openBagObject.SetActive(false);

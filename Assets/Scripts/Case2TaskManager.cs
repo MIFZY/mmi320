@@ -1,139 +1,141 @@
-using System.Text;
 using UnityEngine;
 using UnityEngine.Events;
 using TMPro;
 
 public class Case2TaskManager : MonoBehaviour
 {
-    [Header("Panel UI References")]
-    public GameObject taskPanelUI;
+    [Header("UI References")]
     public TMP_Text taskHeaderText;
     public TMP_Text taskListText;
 
-    [Header("Step Labels (English to avoid missing Thai glyphs)")]
-    public string headerLabel = "CASE 2: SEVERED FINGER";
-    public string step1Label = "1. Safety Check (Turn off stove)";
-    public string step2Label = "2. Stop Bleeding (Gauze)";
-    public string step3Label = "3. Put Severed Finger in Bag";
-    public string step4Label = "4. Put Ice into Bucket";
-    public string step5Label = "5. Place Bag in Ice Bucket";
-    public string step6Label = "6. Call 1669";
-
-    [Header("Order Rules")]
-    [Tooltip("บังคับทำเรียงทีละขั้น 1 -> 2 -> 3 -> 4 -> 5 -> 6 ห้ามข้ามขั้น")]
-    public bool enforceStepOrder = true;
-
-    [Header("Completion States")]
+    [Header("Case 2 Task States (1-6)")]
     public bool step1SafetyDone = false;
     public bool step2BleedingDone = false;
-    public bool step3BagFingerDone = false;
+    public bool step3FingerBaggedDone = false;
     public bool step4IceInBucketDone = false;
-    public bool step5SoakInIceDone = false;
-    public bool step6Call1669Done = false;
+    public bool step5SoakedInIceDone = false;
+    public bool step6Called1669Done = false;
+
+    [Header("Rule Settings")]
+    [Tooltip("ล็อคเด็ดขาดให้ทำ Step 1 ก่อนเสมอ ไม่งั้นบล็อกการทำขั้น 2-6")]
+    public bool lockStep1First = true;
+
+    [Tooltip("ขั้น 2-5 ทำสลับลำดับกันได้อิสระหลัง Step 1 เสร็จ")]
+    public bool allowFlexibleOrderForSteps2To5 = true;
+
+    [Tooltip("ล็อคให้โทร 1669 (Step 6) เป็นขั้นตอนสุดท้ายหลัง Step 1-5 ครบ")]
+    public bool lockStep6Last = true;
 
     [Header("Events")]
     public UnityEvent onAllTasksCompleted;
+    public UnityEvent<string> onBlockedActionMessage;
 
-    private readonly StringBuilder sb = new StringBuilder();
+    public bool IsStep1SafetyDone => step1SafetyDone;
 
-    public bool CanCallEmergencyNow =>
-        !enforceStepOrder || (step1SafetyDone && step2BleedingDone && step3BagFingerDone && step4IceInBucketDone && step5SoakInIceDone);
+    public bool AreSteps1To5Done =>
+        step1SafetyDone &&
+        step2BleedingDone &&
+        step3FingerBaggedDone &&
+        step4IceInBucketDone &&
+        step5SoakedInIceDone;
+
+    public bool CanCallEmergencyNow => !lockStep6Last || AreSteps1To5Done;
 
     private void Start()
     {
-        if (taskPanelUI != null)
-        {
-            taskPanelUI.SetActive(true);
-        }
-
-        if (taskHeaderText != null)
-        {
-            taskHeaderText.text = headerLabel;
-        }
-
-        RefreshTaskUI();
+        RefreshUI();
     }
 
-    // ขั้นที่ 1: ประเมินความปลอดภัย / ปิดเตาแก๊ส
+    public bool CanPerformSteps2To5(string blockedMessage = "Turn off the stove first!")
+    {
+        if (lockStep1First && !step1SafetyDone)
+        {
+            onBlockedActionMessage?.Invoke(blockedMessage);
+            return false;
+        }
+        return true;
+    }
+
     public void CompleteStep1_Safety()
     {
         if (step1SafetyDone) return;
         step1SafetyDone = true;
-        RefreshTaskUI();
+        RefreshUI();
     }
 
-    // ขั้นที่ 2: ใช้ผ้าก๊อซกดห้ามเลือด
     public void CompleteStep2_StopBleeding()
     {
         if (step2BleedingDone) return;
-        if (enforceStepOrder && !step1SafetyDone) return;
+        if (!CanPerformSteps2To5("Turn off the stove before stopping bleeding!")) return;
+
         step2BleedingDone = true;
-        RefreshTaskUI();
+        RefreshUI();
     }
 
-    // ขั้นที่ 3: เก็บนิ้วใส่ถุง
     public void CompleteStep3_BagFinger()
     {
-        if (step3BagFingerDone) return;
-        if (enforceStepOrder && !step2BleedingDone) return;
-        step3BagFingerDone = true;
-        RefreshTaskUI();
+        if (step3FingerBaggedDone) return;
+        if (!CanPerformSteps2To5("Turn off the stove before bagging the finger!")) return;
+
+        step3FingerBaggedDone = true;
+        RefreshUI();
     }
 
-    // ขั้นที่ 4: เอาน้ำแข็งใส่ถัง
     public void CompleteStep4_IceInBucket()
     {
         if (step4IceInBucketDone) return;
-        if (enforceStepOrder && !step3BagFingerDone) return;
+        if (!CanPerformSteps2To5("Turn off the stove before getting ice!")) return;
+
         step4IceInBucketDone = true;
-        RefreshTaskUI();
+        RefreshUI();
     }
 
-    // ขั้นที่ 5: แช่ในภาชนะน้ำแข็ง
     public void CompleteStep5_SoakInIce()
     {
-        if (step5SoakInIceDone) return;
-        if (enforceStepOrder && !step4IceInBucketDone) return;
-        step5SoakInIceDone = true;
-        RefreshTaskUI();
+        if (step5SoakedInIceDone) return;
+        if (!CanPerformSteps2To5("Turn off the stove before soaking in ice!")) return;
+
+        step5SoakedInIceDone = true;
+        RefreshUI();
     }
 
-    // ขั้นที่ 6: โทร 1669 (ขั้นตอนสุดท้าย ข้ามขั้นไม่ได้)
     public void CompleteStep6_Call1669()
     {
-        if (step6Call1669Done) return;
-        if (!CanCallEmergencyNow) return;
+        if (step6Called1669Done) return;
 
-        step6Call1669Done = true;
-        RefreshTaskUI();
+        if (lockStep6Last && !AreSteps1To5Done)
+        {
+            onBlockedActionMessage?.Invoke("Complete steps 1-5 before calling 1669!");
+            return;
+        }
+
+        step6Called1669Done = true;
+        RefreshUI();
         onAllTasksCompleted?.Invoke();
     }
 
-    public void RefreshTaskUI()
+    public void RefreshUI()
     {
+        if (taskHeaderText != null)
+        {
+            taskHeaderText.text = "CASE 2: SEVERED FINGER";
+        }
+
         if (taskListText == null) return;
 
-        sb.Clear();
-        sb.AppendLine(FormatStep(step1Label, step1SafetyDone, true));
-        sb.AppendLine(FormatStep(step2Label, step2BleedingDone, step1SafetyDone));
-        sb.AppendLine(FormatStep(step3Label, step3BagFingerDone, step2BleedingDone));
-        sb.AppendLine(FormatStep(step4Label, step4IceInBucketDone, step3BagFingerDone));
-        sb.AppendLine(FormatStep(step5Label, step5SoakInIceDone, step4IceInBucketDone));
-        sb.AppendLine(FormatStep(step6Label, step6Call1669Done, step5SoakInIceDone));
+        string s1 = step1SafetyDone ? "done" : "current";
+        string s2 = step2BleedingDone ? "done" : (!step1SafetyDone && lockStep1First ? "locked" : "available");
+        string s3 = step3FingerBaggedDone ? "done" : (!step1SafetyDone && lockStep1First ? "locked" : "available");
+        string s4 = step4IceInBucketDone ? "done" : (!step1SafetyDone && lockStep1First ? "locked" : "available");
+        string s5 = step5SoakedInIceDone ? "done" : (!step1SafetyDone && lockStep1First ? "locked" : "available");
+        string s6 = step6Called1669Done ? "done" : (AreSteps1To5Done ? "current" : "locked");
 
-        taskListText.text = sb.ToString();
-    }
-
-    private string FormatStep(string label, bool isDone, bool isUnlocked)
-    {
-        if (isDone)
-        {
-            return $"{label} - <b>done</b>";
-        }
-        if (!enforceStepOrder || isUnlocked)
-        {
-            return $"{label} - in progress";
-        }
-        return $"{label} - locked";
+        taskListText.text =
+            $"1. Safety Check (Turn off stove) - {s1}\n" +
+            $"2. Stop Bleeding (Gauze) - {s2}\n" +
+            $"3. Put Severed Finger in Bag - {s3}\n" +
+            $"4. Put Ice into Bucket - {s4}\n" +
+            $"5. Place Bag in Ice Bucket - {s5}\n" +
+            $"6. Call 1669 - {s6}";
     }
 }

@@ -317,6 +317,8 @@ MonoBehaviour:
   taskManager: {fileID: 815890558}
   bareFingerTag: SeveredFinger
   baggedFingerTag: BaggedFinger
+  emptyBagTag: EmptyBag
+  requireFingerInsideBagBeforeIceSnap: 1
   openBagObject: {fileID: 0}
   sealedBagObject: {fileID: 0}
   onSnappedToZipBag:
@@ -1186,7 +1188,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 389, y: 144}
+  m_AnchoredPosition: {x: 287, y: 126}
   m_SizeDelta: {x: 322.6, y: 245.4}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &463105762
@@ -1713,24 +1715,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4d4828d9f45769e41995e6e19c6ba408, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Case2TaskManager
-  taskPanelUI: {fileID: 463105760}
   taskHeaderText: {fileID: 539809604}
   taskListText: {fileID: 2064945758}
-  headerLabel: 'CASE 2: SEVERED FINGER'
-  step1Label: 1. Safety Check (Turn off stove)
-  step2Label: 2. Stop Bleeding (Gauze)
-  step3Label: 3. Put Severed Finger in Bag
-  step4Label: 4. Put Ice into Bucket
-  step5Label: 5. Place Bag in Ice Bucket
-  step6Label: 6. Call 1669
-  enforceStepOrder: 1
   step1SafetyDone: 0
   step2BleedingDone: 0
-  step3BagFingerDone: 0
+  step3FingerBaggedDone: 0
   step4IceInBucketDone: 0
-  step5SoakInIceDone: 0
-  step6Call1669Done: 0
+  step5SoakedInIceDone: 0
+  step6Called1669Done: 0
+  lockStep1First: 1
+  allowFlexibleOrderForSteps2To5: 1
+  lockStep6Last: 1
   onAllTasksCompleted:
+    m_PersistentCalls:
+      m_Calls: []
+  onBlockedActionMessage:
     m_PersistentCalls:
       m_Calls: []
 --- !u!4 &815890559
@@ -2302,9 +2301,11 @@ MonoBehaviour:
   lockAfterSnap: 1
   disableSolidCollidersOnSnap: 1
   lockParentContainerOnIceSnap: 0
-  taskManager: {fileID: 0}
+  taskManager: {fileID: 815890558}
   bareFingerTag: SeveredFinger
   baggedFingerTag: BaggedFinger
+  emptyBagTag: Untagged
+  requireFingerInsideBagBeforeIceSnap: 1
   openBagObject: {fileID: 0}
   sealedBagObject: {fileID: 0}
   onSnappedToZipBag:
@@ -18174,7 +18175,7 @@ GameObject:
   - component: {fileID: 8132857655450319377}
   m_Layer: 0
   m_Name: bagzip
-  m_TagString: BaggedFinger
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -19576,6 +19577,7 @@ MonoBehaviour:
   iceInsideBucket: {fileID: 276940104550954857}
   iceContainerSocket: {fileID: 1074692071}
   taskManager: {fileID: 0}
+  requireStep1BeforeFill: 1
   interactRange: 4
   requireBucketNearFridge: 0
   iceBucketTransform: {fileID: 0}

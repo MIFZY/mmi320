@@ -76,6 +76,17 @@ public class WoundHemostasisSocket : MonoBehaviour
     {
         if (other == null || isCompleted) return;
 
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
+        }
+
+        if (taskManager != null && !taskManager.CanPerformSteps2To5("Turn off the stove first!"))
+        {
+            onStatusMessage?.Invoke("Turn off the stove first!");
+            return;
+        }
+
         Rigidbody rb = other.attachedRigidbody;
         Transform targetRoot = rb != null ? rb.transform : other.transform.root;
 
