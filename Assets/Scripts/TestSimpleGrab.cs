@@ -67,16 +67,17 @@ public class TestSimpleGrab : MonoBehaviour
         var kb = Keyboard.current;
         if (kb == null) return;
 
-        // กด E = หยิบของเมื่อยังไม่ได้ถืออะไร
-        if (kb.eKey.wasPressedThisFrame && heldRb == null)
-        {
-            TryGrabObject();
-        }
-
-        // กด Q = วางของเมื่อกำลังถืออยู่
+        // กด Q = วางของเมื่อกำลังถืออยู่เท่านั้น
         if (kb.qKey.wasPressedThisFrame && heldRb != null)
         {
             ReleaseHeldObject();
+            return;
+        }
+
+        // กด E = อินเทอร์แรคหรือหยิบของ
+        if (kb.eKey.wasPressedThisFrame)
+        {
+            TryInteractOrGrab();
         }
     }
 
@@ -86,6 +87,7 @@ public class TestSimpleGrab : MonoBehaviour
 
         if (IsTargetLocked(heldTransform) || heldRb.isKinematic)
         {
+            SetIgnorePlayerCollisions(heldTransform, false);
             ClearHeldReferenceWithoutPhysicsRestore();
             return;
         }
@@ -105,9 +107,40 @@ public class TestSimpleGrab : MonoBehaviour
         heldRb.MoveRotation(smoothedRot);
     }
 
-    private void TryGrabObject()
+    private void TryInteractOrGrab()
     {
         Ray ray = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+
+        // 1. ตรวจสอบจุดอินเทอร์แรคเฉพาะ (รวม Trigger เช่น ปุ่มหรือจุดกดของเตาแก๊ส/ตู้ทำน้ำแข็ง/โทรศัพท์)
+        if (Physics.Raycast(ray, out RaycastHit triggerHit, grabRange, grabbableLayerMask, QueryTriggerInteraction.Collide))
+        {
+            GasStoveController stove = triggerHit.collider.GetComponentInParent<GasStoveController>();
+            if (stove != null)
+            {
+                stove.SendMessage("TurnOffGas", SendMessageOptions.DontRequireReceiver);
+                stove.SendMessage("ToggleGasStove", SendMessageOptions.DontRequireReceiver);
+                return;
+            }
+
+            FridgeIceDispenser iceDispenser = triggerHit.collider.GetComponentInParent<FridgeIceDispenser>();
+            if (iceDispenser != null)
+            {
+                iceDispenser.SendMessage("DispenseIce", SendMessageOptions.DontRequireReceiver);
+                iceDispenser.SendMessage("TryDispenseIce", SendMessageOptions.DontRequireReceiver);
+                return;
+            }
+
+            EmergencyDialer1669 phoneDialer = triggerHit.collider.GetComponentInParent<EmergencyDialer1669>();
+            if (phoneDialer != null)
+            {
+                phoneDialer.SendMessage("OpenDialPad", SendMessageOptions.DontRequireReceiver);
+            }
+        }
+
+        // หากกำลังถือของอยู่แล้ว ไม่หยิบชิ้นใหม่ซ้อน
+        if (heldRb != null) return;
+
+        // 2. หยิบออบเจกต์ที่มี Rigidbody (ข้าม Trigger เพื่อไม่ให้เล็งพลาดทะลุจุดรับ)
         if (Physics.Raycast(ray, out RaycastHit hit, grabRange, grabbableLayerMask, QueryTriggerInteraction.Ignore))
         {
             Rigidbody targetRb = hit.rigidbody;
@@ -166,6 +199,12 @@ public class TestSimpleGrab : MonoBehaviour
             SetIgnorePlayerCollisions(heldTransform, false);
             ClearHeldReferenceWithoutPhysicsRestore();
         }
+    }
+
+    public bool IsHolding(Transform target)
+    {
+        if (heldTransform == null || target == null) return false;
+        return heldTransform == target || heldTransform == target.root || target.IsChildOf(heldTransform) || heldTransform.IsChildOf(target);
     }
 
     private void ClearHeldReferenceWithoutPhysicsRestore()
