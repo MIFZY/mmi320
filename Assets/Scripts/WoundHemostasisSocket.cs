@@ -13,6 +13,9 @@ public class WoundHemostasisSocket : MonoBehaviour
     public bool hideClothAfterSnap = true;
     public bool disableClothCollidersOnSnap = true;
 
+    [Header("Task Link")]
+    public Case2TaskManager taskManager;
+
     [Header("Optional Blood / Wound Visuals")]
     [Tooltip("ลากออบเจกต์เอฟเฟกต์เลือดหรือรอยแผลสดมาใส่ เพื่อซ่อน/ลดตอนห้ามเลือดสำเร็จ")]
     public GameObject bleedingVisualObject;
@@ -46,6 +49,11 @@ public class WoundHemostasisSocket : MonoBehaviour
         if (snapPoint == null)
         {
             snapPoint = transform;
+        }
+
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
         }
 
         if (bandagedVisualObject != null)
@@ -187,6 +195,16 @@ public class WoundHemostasisSocket : MonoBehaviour
         if (bandagedVisualObject != null)
         {
             bandagedVisualObject.SetActive(true);
+        }
+
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
+        }
+
+        if (taskManager != null)
+        {
+            taskManager.CompleteStep2_StopBleeding();
         }
 
         onStatusMessage?.Invoke("ห้ามเลือดด้วยผ้าเรียบร้อยแล้ว");

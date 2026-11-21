@@ -12,7 +12,9 @@ public class EmergencyDialer1669 : MonoBehaviour
     public bool requirePhoneHeldFirst = true;
     public float wrongNumberResetDelay = 1.0f;
 
-    [Header("End Game Settings")]
+    [Header("Task & End Game Settings")]
+    public Case2TaskManager taskManager;
+
     [Tooltip("End game UI panel (optional) shown when 1669 is called")]
     public GameObject endGameUI;
 
@@ -46,6 +48,11 @@ public class EmergencyDialer1669 : MonoBehaviour
     private void Awake()
     {
         grabSystem = FindAnyObjectByType<TestSimpleGrab>();
+
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
+        }
 
         if (dialPadUI != null)
         {
@@ -149,8 +156,18 @@ public class EmergencyDialer1669 : MonoBehaviour
         if (isCompleted) return;
         if (requirePhoneHeldFirst && !isPhoneHeld) return;
 
+        if (taskManager != null && !taskManager.CanCallEmergencyNow)
+        {
+            SetStatus("Finish steps 1-5 first");
+            return;
+        }
+
         if (currentInput.ToString() == targetNumber)
         {
+            if (taskManager != null)
+            {
+                taskManager.CompleteStep6_Call1669();
+            }
             CompleteGame();
         }
         else

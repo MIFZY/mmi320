@@ -12,6 +12,9 @@ public class GasStoveController : MonoBehaviour
     public Transform knobTransform;
     public Vector3 offKnobLocalEuler = new Vector3(0f, 0f, 90f);
 
+    [Header("Task Link")]
+    public Case2TaskManager taskManager;
+
     [Header("Interaction Settings")]
     public float interactRange = 4.0f;
     public bool isGasOn = true;
@@ -25,6 +28,12 @@ public class GasStoveController : MonoBehaviour
     private void Start()
     {
         cam = Camera.main;
+
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
+        }
+
         if (flameObject != null)
         {
             flameObject.SetActive(isGasOn);
@@ -70,6 +79,16 @@ public class GasStoveController : MonoBehaviour
         if (knobTransform != null)
         {
             knobTransform.localEulerAngles = offKnobLocalEuler;
+        }
+
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
+        }
+
+        if (taskManager != null)
+        {
+            taskManager.CompleteStep1_Safety();
         }
 
         onStatusMessage?.Invoke("ปิดเตาแก๊สเรียบร้อยแล้ว");

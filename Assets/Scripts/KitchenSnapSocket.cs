@@ -19,6 +19,9 @@ public class KitchenSnapSocket : MonoBehaviour
     public bool disableSolidCollidersOnSnap = true;
     public bool lockParentContainerOnIceSnap = true;
 
+    [Header("Task Link")]
+    public Case2TaskManager taskManager;
+
     [Header("Tags")]
     public string bareFingerTag = "SeveredFinger";
     public string baggedFingerTag = "BaggedFinger";
@@ -51,6 +54,11 @@ public class KitchenSnapSocket : MonoBehaviour
         if (snapPoint == null)
         {
             snapPoint = transform;
+        }
+
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
         }
 
         if (socketMode == SocketMode.ZipBagSocket)
@@ -211,6 +219,12 @@ public class KitchenSnapSocket : MonoBehaviour
             if (openBagObject != null) openBagObject.SetActive(false);
             if (sealedBagObject != null) sealedBagObject.SetActive(true);
 
+            if (taskManager == null)
+            {
+                taskManager = FindAnyObjectByType<Case2TaskManager>();
+            }
+            taskManager?.CompleteStep3_BagFinger();
+
             onSnappedToZipBag?.Invoke();
         }
         else
@@ -224,6 +238,12 @@ public class KitchenSnapSocket : MonoBehaviour
                     bucketRb.isKinematic = true;
                 }
             }
+
+            if (taskManager == null)
+            {
+                taskManager = FindAnyObjectByType<Case2TaskManager>();
+            }
+            taskManager?.CompleteStep5_SoakInIce();
 
             onSnappedToIceContainer?.Invoke();
         }

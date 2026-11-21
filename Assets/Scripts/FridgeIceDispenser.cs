@@ -11,6 +11,9 @@ public class FridgeIceDispenser : MonoBehaviour
     [Tooltip("ลาก IceContainerSocket มาใส่ (จะเปิดใช้งานเมื่อมีน้ำแข็งแล้ว)")]
     public GameObject iceContainerSocket;
 
+    [Header("Task Link")]
+    public Case2TaskManager taskManager;
+
     [Header("Interaction Settings")]
     public float interactRange = 4.0f;
     public bool requireBucketNearFridge = false;
@@ -27,6 +30,11 @@ public class FridgeIceDispenser : MonoBehaviour
     private void Start()
     {
         cam = Camera.main;
+
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
+        }
 
         // เริ่มเกมให้ซ่อนน้ำแข็งในถัง (เป็นถังเปล่า) และปิดจุดแช่นิ้วไว้ก่อน
         if (iceInsideBucket != null)
@@ -79,6 +87,12 @@ public class FridgeIceDispenser : MonoBehaviour
 
         if (iceContainerSocket != null)
             iceContainerSocket.SetActive(true);
+
+        if (taskManager == null)
+        {
+            taskManager = FindAnyObjectByType<Case2TaskManager>();
+        }
+        taskManager?.CompleteStep4_IceInBucket();
 
         onStatusMessage?.Invoke("เติมน้ำแข็งลงถังเรียบร้อยแล้ว");
         onIceFilled?.Invoke();
