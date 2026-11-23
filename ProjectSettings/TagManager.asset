@@ -7,7 +7,8 @@ TagManager:
   - SeveredFinger
   - BaggedFinger
   - BleedingCloth
-  - EmptyBag
+  - NewsPaper
+  - Cloth
   layers:
   - Default
   - TransparentFX

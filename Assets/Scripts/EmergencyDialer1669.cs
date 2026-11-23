@@ -13,6 +13,10 @@ public class EmergencyDialer1669 : MonoBehaviour
     public float wrongNumberResetDelay = 1.0f;
 
     [Header("Task & End Game Settings")]
+    [Tooltip("Assigned automatically in Case 1 if Case1TaskManager exists in scene")]
+    public Case1TaskManager case1TaskManager;
+
+    [Tooltip("Used in Case 2 (auto-found if present in scene)")]
     public Case2TaskManager taskManager;
 
     [Tooltip("End game UI panel (optional) shown when 1669 is called")]
@@ -48,6 +52,13 @@ public class EmergencyDialer1669 : MonoBehaviour
     private void Awake()
     {
         grabSystem = FindAnyObjectByType<TestSimpleGrab>();
+
+        if (case1TaskManager == null)
+        {
+            case1TaskManager = Case1TaskManager.Instance != null
+                ? Case1TaskManager.Instance
+                : FindAnyObjectByType<Case1TaskManager>();
+        }
 
         if (taskManager == null)
         {
@@ -156,7 +167,16 @@ public class EmergencyDialer1669 : MonoBehaviour
         if (isCompleted) return;
         if (requirePhoneHeldFirst && !isPhoneHeld) return;
 
-        if (taskManager != null && !taskManager.CanCallEmergencyNow)
+        Case1TaskManager activeCase1 = case1TaskManager != null ? case1TaskManager : Case1TaskManager.Instance;
+        if (activeCase1 != null)
+        {
+            if (!activeCase1.CanPerformTask(4))
+            {
+                SetStatus("Complete steps 1-3 first");
+                return;
+            }
+        }
+        else if (taskManager != null && !taskManager.CanCallEmergencyNow)
         {
             SetStatus("Finish steps 1-5 first");
             return;
@@ -164,10 +184,15 @@ public class EmergencyDialer1669 : MonoBehaviour
 
         if (currentInput.ToString() == targetNumber)
         {
-            if (taskManager != null)
+            if (activeCase1 != null)
+            {
+                activeCase1.CompleteTask4_Call1669();
+            }
+            else if (taskManager != null)
             {
                 taskManager.CompleteStep6_Call1669();
             }
+
             CompleteGame();
         }
         else
