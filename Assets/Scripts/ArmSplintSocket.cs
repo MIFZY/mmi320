@@ -10,7 +10,7 @@ public class ArmSplintSocket : MonoBehaviour
 
     [Header("Release Key (Must Press Q to Snap)")]
     [SerializeField] private KeyCode releaseKey = KeyCode.Q;
-    [SerializeField] private float releaseSnapRadius = 1.2f;
+    [SerializeField] private float releaseSnapRadius = 2.0f;
     [SerializeField] private Transform playerRoot;
 
     [Header("Snap Points (Where items attach on the arm)")]
@@ -24,6 +24,9 @@ public class ArmSplintSocket : MonoBehaviour
     [Header("Behavior")]
     [SerializeField] private bool lockItemPhysicsOnSnap = true;
     [SerializeField] private bool disableGrabScriptOnSnap = true;
+
+    [Header("Debug")]
+    [SerializeField] private bool debugLogs = true;
 
     [Header("Events")]
     public UnityEvent onNewspaperSnapped;
@@ -54,23 +57,24 @@ public class ArmSplintSocket : MonoBehaviour
 
     private void Update()
     {
-        // บังคับต้องกดปุ่ม Q เท่านั้น ห้าม Snap จาก Trigger เอง
         if (!Input.GetKeyDown(releaseKey))
             return;
 
         TestSimpleGrab grabber = FindFirstObjectByType<TestSimpleGrab>();
 
-        // 1. เช็กไอเทมที่อยู่ใน Trigger Zone ตอนที่กด Q
-        if (itemInZone != null && IsTargetItem(itemInZone))
+        if (debugLogs)
         {
-            if (IsHeldOrValidForRelease(itemInZone, grabber))
-            {
-                TrySnapItem(itemInZone, grabber);
-                return;
-            }
+            Debug.Log($"[ArmSplintSocket] Q pressed | newspaperDone={newspaperDone}, clothDone={clothDone}, itemInZone={(itemInZone ? itemInZone.name : "null")}, IsHoldingObject={(grabber != null && grabber.IsHoldingObject)}");
         }
 
-        // 2. เผื่อกรณีถือไอเทมอยู่ในระยะ releaseSnapRadius จากจุด Snap ตอนกด Q
+        // 1. ไอเทมอยู่ใน Trigger Zone ตอนกด Q
+        if (itemInZone != null && IsTargetItem(itemInZone))
+        {
+            TrySnapItem(itemInZone, grabber);
+            return;
+        }
+
+        // 2. ไอเทมที่กำลังถืออยู่ (เช็กทั้งระยะของไอเทม และระยะของผู้เล่นถึงจุดสแนป)
         if (grabber != null && grabber.IsHoldingObject)
         {
             Rigidbody[] rbs = FindObjectsByType<Rigidbody>(FindObjectsSortMode.None);
@@ -81,14 +85,62 @@ public class ArmSplintSocket : MonoBehaviour
                 if (!IsTargetItem(candidate)) continue;
                 if (!grabber.IsHolding(candidate.transform)) continue;
 
-                float dist = Vector3.Distance(rb.position, transform.position);
-                if (dist <= releaseSnapRadius)
+                Transform refPoint = GetReferenceSnapPoint(candidate);
+                float itemDistSocket = Vector3.Distance(rb.position, transform.position);
+                float itemDistPoint = Vector3.Distance(rb.position, refPoint.position);
+                float playerDistSocket = playerRoot != null ? Vector3.Distance(playerRoot.position, transform.position) : float.MaxValue;
+                float playerDistPoint = playerRoot != null ? Vector3.Distance(playerRoot.position, refPoint.position) : float.MaxValue;
+
+                if (debugLogs)
+                {
+                    Debug.Log($"[ArmSplintSocket] Holding '{candidate.name}' | itemDist={Mathf.Min(itemDistSocket, itemDistPoint):F2}, playerDist={Mathf.Min(playerDistSocket, playerDistPoint):F2}, radius={releaseSnapRadius}");
+                }
+
+                if (itemDistSocket <= releaseSnapRadius ||
+                    itemDistPoint <= releaseSnapRadius ||
+                    playerDistSocket <= releaseSnapRadius ||
+                    playerDistPoint <= releaseSnapRadius)
                 {
                     TrySnapItem(candidate, grabber);
                     return;
                 }
             }
         }
+
+        // 3. กรณีเพิ่งกด Q ปล่อยของไปแล้ว (IsHoldingObject = False) แต่อยู่ใกล้จุดสแนปหรือผู้เล่นเดินอยู่ใกล้
+        Transform[] allTransforms = FindObjectsByType<Transform>(FindObjectsSortMode.None);
+        foreach (Transform t in allTransforms)
+        {
+            if (t == null) continue;
+            GameObject candidate = ResolveItemObject(t.gameObject);
+            if (!IsTargetItem(candidate)) continue;
+
+            Transform refPoint = GetReferenceSnapPoint(candidate);
+            float distItemPoint = Vector3.Distance(candidate.transform.position, refPoint.position);
+            float distItemSocket = Vector3.Distance(candidate.transform.position, transform.position);
+            float distPlayerPoint = playerRoot != null ? Vector3.Distance(playerRoot.position, refPoint.position) : float.MaxValue;
+
+            if (distItemPoint <= releaseSnapRadius || distItemSocket <= releaseSnapRadius || distPlayerPoint <= releaseSnapRadius)
+            {
+                if (debugLogs)
+                {
+                    Debug.Log($"[ArmSplintSocket] Fallback snap '{candidate.name}' | distItemPoint={distItemPoint:F2}, distPlayerPoint={distPlayerPoint:F2}");
+                }
+                TrySnapItem(candidate, grabber);
+                return;
+            }
+        }
+    }
+
+    private Transform GetReferenceSnapPoint(GameObject itemObj)
+    {
+        if (!newspaperDone && HasMatchingTagInHierarchy(itemObj, newspaperTag) && newspaperSnapPoint != null)
+            return newspaperSnapPoint;
+
+        if (!clothDone && HasMatchingTagInHierarchy(itemObj, clothTag) && clothSnapPoint != null)
+            return clothSnapPoint;
+
+        return transform;
     }
 
     private void OnTriggerEnter(Collider other)
@@ -98,6 +150,7 @@ public class ArmSplintSocket : MonoBehaviour
         if (IsTargetItem(candidate))
         {
             itemInZone = candidate;
+            if (debugLogs) Debug.Log($"[ArmSplintSocket] OnTriggerEnter -> itemInZone = {candidate.name}");
         }
     }
 
@@ -119,24 +172,6 @@ public class ArmSplintSocket : MonoBehaviour
         {
             itemInZone = null;
         }
-    }
-
-    private bool IsHeldOrValidForRelease(GameObject itemObj, TestSimpleGrab grabber)
-    {
-        if (itemObj == null) return false;
-
-        if (grabber != null && grabber.IsHolding(itemObj.transform))
-            return true;
-
-        if (playerRoot != null && itemObj.transform.IsChildOf(playerRoot))
-            return true;
-
-        if (Camera.main != null && itemObj.transform.IsChildOf(Camera.main.transform))
-            return true;
-
-        // กรณีผู้เล่นเพิ่งกด Q แล้ว TestSimpleGrab ปล่อยมือไปแล้วแต่ของยังอยู่ในโซน/ระยะใกล้แขน
-        float dist = Vector3.Distance(itemObj.transform.position, transform.position);
-        return dist <= releaseSnapRadius;
     }
 
     private GameObject ResolveItemObject(GameObject hitObj)
@@ -182,7 +217,11 @@ public class ArmSplintSocket : MonoBehaviour
         if (itemObj == null) return;
 
         Case1TaskManager manager = Case1TaskManager.Instance;
-        if (manager == null) return;
+        if (manager == null)
+        {
+            if (debugLogs) Debug.LogWarning("[ArmSplintSocket] Case1TaskManager.Instance is null!");
+            return;
+        }
 
         bool isNewspaper = !newspaperDone && HasMatchingTagInHierarchy(itemObj, newspaperTag);
         bool isCloth = !clothDone && HasMatchingTagInHierarchy(itemObj, clothTag);
@@ -191,7 +230,10 @@ public class ArmSplintSocket : MonoBehaviour
         if (isNewspaper)
         {
             if (!manager.CompleteTask2_PlaceNewspaper())
+            {
+                if (debugLogs) Debug.LogWarning("[ArmSplintSocket] CompleteTask2_PlaceNewspaper() returned false!");
                 return;
+            }
 
             newspaperDone = true;
             if (itemInZone == itemObj) itemInZone = null;
@@ -210,7 +252,10 @@ public class ArmSplintSocket : MonoBehaviour
         if (isCloth)
         {
             if (!manager.CompleteTask3_WrapCloth())
+            {
+                if (debugLogs) Debug.LogWarning("[ArmSplintSocket] CompleteTask3_WrapCloth() returned false!");
                 return;
+            }
 
             clothDone = true;
             if (itemInZone == itemObj) itemInZone = null;
@@ -271,6 +316,7 @@ public class ArmSplintSocket : MonoBehaviour
         itemObj.transform.SetParent(targetPoint);
         itemObj.transform.localPosition = Vector3.zero;
         itemObj.transform.localRotation = Quaternion.identity;
+        itemObj.transform.localScale = Vector3.one;
 
         return itemObj;
     }

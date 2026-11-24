@@ -8,6 +8,16 @@ public class Case2TaskManager : MonoBehaviour
     public TMP_Text taskHeaderText;
     public TMP_Text taskListText;
 
+    [Header("Audio")]
+    [Tooltip("ลากออบเจกต์ที่มีคอมโพเนนต์ GauzeBleedingAudio มาใส่ (ตอนเอาผ้าก๊อซสแนปห้ามเลือดที่มือ Step 2)")]
+    public GauzeBleedingAudio gauzeBleedingAudio;
+
+    [Tooltip("ลากออบเจกต์ที่มีคอมโพเนนต์ BagFingerAudio มาใส่ (ตอนเอานิ้วเข้าถุง Step 3)")]
+    public BagFingerAudio bagFingerAudio;
+
+    [Tooltip("ลากออบเจกต์ที่มีคอมโพเนนต์ BagInIceBucketAudio มาใส่ (ตอนเอาถุงสแนปลงถังน้ำแข็ง Step 5)")]
+    public BagInIceBucketAudio bagInIceBucketAudio;
+
     [Header("Case 2 Task States (1-6)")]
     public bool step1SafetyDone = false;
     public bool step2BleedingDone = false;
@@ -43,6 +53,27 @@ public class Case2TaskManager : MonoBehaviour
 
     private void Start()
     {
+        if (gauzeBleedingAudio == null)
+        {
+            gauzeBleedingAudio = GetComponentInChildren<GauzeBleedingAudio>();
+            if (gauzeBleedingAudio == null)
+                gauzeBleedingAudio = FindAnyObjectByType<GauzeBleedingAudio>();
+        }
+
+        if (bagFingerAudio == null)
+        {
+            bagFingerAudio = GetComponentInChildren<BagFingerAudio>();
+            if (bagFingerAudio == null)
+                bagFingerAudio = FindAnyObjectByType<BagFingerAudio>();
+        }
+
+        if (bagInIceBucketAudio == null)
+        {
+            bagInIceBucketAudio = GetComponentInChildren<BagInIceBucketAudio>();
+            if (bagInIceBucketAudio == null)
+                bagInIceBucketAudio = FindAnyObjectByType<BagInIceBucketAudio>();
+        }
+
         RefreshUI();
     }
 
@@ -69,6 +100,19 @@ public class Case2TaskManager : MonoBehaviour
         if (!CanPerformSteps2To5("Turn off the stove before stopping bleeding!")) return;
 
         step2BleedingDone = true;
+
+        if (gauzeBleedingAudio == null)
+        {
+            gauzeBleedingAudio = GetComponentInChildren<GauzeBleedingAudio>();
+            if (gauzeBleedingAudio == null)
+                gauzeBleedingAudio = FindAnyObjectByType<GauzeBleedingAudio>();
+        }
+
+        if (gauzeBleedingAudio != null)
+        {
+            gauzeBleedingAudio.PlayGauzeSound();
+        }
+
         RefreshUI();
     }
 
@@ -78,6 +122,19 @@ public class Case2TaskManager : MonoBehaviour
         if (!CanPerformSteps2To5("Turn off the stove before bagging the finger!")) return;
 
         step3FingerBaggedDone = true;
+
+        if (bagFingerAudio == null)
+        {
+            bagFingerAudio = GetComponentInChildren<BagFingerAudio>();
+            if (bagFingerAudio == null)
+                bagFingerAudio = FindAnyObjectByType<BagFingerAudio>();
+        }
+
+        if (bagFingerAudio != null)
+        {
+            bagFingerAudio.PlayFingerInBagSound();
+        }
+
         RefreshUI();
     }
 
@@ -96,6 +153,19 @@ public class Case2TaskManager : MonoBehaviour
         if (!CanPerformSteps2To5("Turn off the stove before soaking in ice!")) return;
 
         step5SoakedInIceDone = true;
+
+        if (bagInIceBucketAudio == null)
+        {
+            bagInIceBucketAudio = GetComponentInChildren<BagInIceBucketAudio>();
+            if (bagInIceBucketAudio == null)
+                bagInIceBucketAudio = FindAnyObjectByType<BagInIceBucketAudio>();
+        }
+
+        if (bagInIceBucketAudio != null)
+        {
+            bagInIceBucketAudio.PlayBagInIceSound();
+        }
+
         RefreshUI();
     }
 

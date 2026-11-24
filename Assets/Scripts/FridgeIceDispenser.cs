@@ -11,6 +11,10 @@ public class FridgeIceDispenser : MonoBehaviour
     [Tooltip("ลาก IceContainerSocket มาใส่ (จะเปิดใช้งานเมื่อมีน้ำแข็งแล้ว)")]
     public GameObject iceContainerSocket;
 
+    [Header("Audio")]
+    [Tooltip("ลากออบเจกต์ที่มีคอมโพเนนต์ FridgeIceAudio มาใส่")]
+    public FridgeIceAudio fridgeIceAudio;
+
     [Header("Task Link & Sequence Guard")]
     public Case2TaskManager taskManager;
 
@@ -37,6 +41,15 @@ public class FridgeIceDispenser : MonoBehaviour
         if (taskManager == null)
         {
             taskManager = FindAnyObjectByType<Case2TaskManager>();
+        }
+
+        if (fridgeIceAudio == null)
+        {
+            fridgeIceAudio = GetComponentInChildren<FridgeIceAudio>();
+            if (fridgeIceAudio == null)
+            {
+                fridgeIceAudio = FindAnyObjectByType<FridgeIceAudio>();
+            }
         }
 
         if (iceInsideBucket != null)
@@ -110,6 +123,20 @@ public class FridgeIceDispenser : MonoBehaviour
 
         if (iceContainerSocket != null)
             iceContainerSocket.SetActive(true);
+
+        if (fridgeIceAudio == null)
+        {
+            fridgeIceAudio = GetComponentInChildren<FridgeIceAudio>();
+            if (fridgeIceAudio == null)
+            {
+                fridgeIceAudio = FindAnyObjectByType<FridgeIceAudio>();
+            }
+        }
+
+        if (fridgeIceAudio != null)
+        {
+            fridgeIceAudio.PlayIceDispenseSound();
+        }
 
         if (taskManager == null)
         {

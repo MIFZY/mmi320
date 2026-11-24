@@ -12,6 +12,10 @@ public class GasStoveController : MonoBehaviour
     public Transform knobTransform;
     public Vector3 offKnobLocalEuler = new Vector3(0f, 0f, 90f);
 
+    [Header("Audio")]
+    [Tooltip("ลากออบเจกต์ที่มีคอมโพเนนต์ StoveFireAudio มาใส่")]
+    public StoveFireAudio stoveFireAudio;
+
     [Header("Task Link")]
     public Case2TaskManager taskManager;
 
@@ -34,9 +38,23 @@ public class GasStoveController : MonoBehaviour
             taskManager = FindAnyObjectByType<Case2TaskManager>();
         }
 
+        if (stoveFireAudio == null)
+        {
+            stoveFireAudio = GetComponentInChildren<StoveFireAudio>();
+            if (stoveFireAudio == null)
+            {
+                stoveFireAudio = FindAnyObjectByType<StoveFireAudio>();
+            }
+        }
+
         if (flameObject != null)
         {
             flameObject.SetActive(isGasOn);
+        }
+
+        if (stoveFireAudio != null)
+        {
+            stoveFireAudio.ToggleFireSound(isGasOn);
         }
     }
 
@@ -74,6 +92,11 @@ public class GasStoveController : MonoBehaviour
         if (flameObject != null)
         {
             flameObject.SetActive(false);
+        }
+
+        if (stoveFireAudio != null)
+        {
+            stoveFireAudio.TurnOffFireSound();
         }
 
         if (knobTransform != null)
