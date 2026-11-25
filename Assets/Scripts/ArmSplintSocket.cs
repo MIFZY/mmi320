@@ -1,5 +1,9 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.InputSystem;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 [RequireComponent(typeof(Collider))]
 public class ArmSplintSocket : MonoBehaviour
@@ -8,10 +12,14 @@ public class ArmSplintSocket : MonoBehaviour
     [SerializeField] private string newspaperTag = "NewPaper";
     [SerializeField] private string clothTag = "Cloth";
 
-    [Header("Release Key (Must Press Q to Snap)")]
-    [SerializeField] private KeyCode releaseKey = KeyCode.Q;
-    [SerializeField] private float releaseSnapRadius = 2.0f;
+    [Header("Auto Snap On Release")]
+    [SerializeField] private bool snapOnRelease = true;
+    [SerializeField] private float releaseSnapRadius = 2.2f;
     [SerializeField] private Transform playerRoot;
+
+    [Header("Optional Manual Trigger (Keyboard Q / VR Button)")]
+    [SerializeField] private KeyCode releaseKey = KeyCode.Q;
+    [SerializeField] private InputActionProperty vrSnapButtonAction;
 
     [Header("Snap Points (Where items attach on the arm)")]
     [SerializeField] private Transform newspaperSnapPoint;
@@ -39,11 +47,38 @@ public class ArmSplintSocket : MonoBehaviour
     private GameObject snappedClothObj;
     private GameObject itemInZone;
 
+    private TestSimpleGrab cachedGrabber;
+    private bool wasHoldingLastFrame = false;
+    private Transform heldItemLastFrame = null;
+    private readonly List<XRGrabInteractable> registeredXRGrabs = new List<XRGrabInteractable>();
+
     private void Reset()
     {
         Collider col = GetComponent<Collider>();
         if (col != null)
             col.isTrigger = true;
+    }
+
+    private void OnEnable()
+    {
+        if (vrSnapButtonAction.action != null)
+        {
+            vrSnapButtonAction.action.Enable();
+            vrSnapButtonAction.action.performed += OnVRSnapPressed;
+        }
+
+        RegisterXRGrabListeners();
+    }
+
+    private void OnDisable()
+    {
+        if (vrSnapButtonAction.action != null)
+        {
+            vrSnapButtonAction.action.performed -= OnVRSnapPressed;
+            vrSnapButtonAction.action.Disable();
+        }
+
+        UnregisterXRGrabListeners();
     }
 
     private void Start()
@@ -53,61 +88,140 @@ public class ArmSplintSocket : MonoBehaviour
 
         if (playerRoot == null && Camera.main != null)
             playerRoot = Camera.main.transform.root;
+
+        cachedGrabber = FindFirstObjectByType<TestSimpleGrab>();
+        RegisterXRGrabListeners();
+    }
+
+    private void RegisterXRGrabListeners()
+    {
+        UnregisterXRGrabListeners();
+
+        XRGrabInteractable[] grabs = FindObjectsByType<XRGrabInteractable>(FindObjectsSortMode.None);
+        foreach (XRGrabInteractable grab in grabs)
+        {
+            if (grab == null) continue;
+            GameObject candidate = ResolveItemObject(grab.gameObject);
+            if (!IsTargetItem(candidate)) continue;
+
+            grab.selectExited.AddListener(OnXRItemReleased);
+            registeredXRGrabs.Add(grab);
+        }
+    }
+
+    private void UnregisterXRGrabListeners()
+    {
+        foreach (XRGrabInteractable grab in registeredXRGrabs)
+        {
+            if (grab != null)
+                grab.selectExited.RemoveListener(OnXRItemReleased);
+        }
+        registeredXRGrabs.Clear();
+    }
+
+    private void OnXRItemReleased(SelectExitEventArgs args)
+    {
+        if (!snapOnRelease || args.interactableObject == null) return;
+
+        GameObject releasedObj = ResolveItemObject(args.interactableObject.transform.gameObject);
+        if (IsTargetItem(releasedObj) && IsWithinSnapRange(releasedObj))
+        {
+            if (debugLogs)
+                Debug.Log($"[ArmSplintSocket] XR released & snapped '{releasedObj.name}'!");
+
+            TrySnapItem(releasedObj, cachedGrabber);
+        }
     }
 
     private void Update()
     {
-        if (!Input.GetKeyDown(releaseKey))
-            return;
+        if (cachedGrabber == null)
+            cachedGrabber = FindFirstObjectByType<TestSimpleGrab>();
 
-        TestSimpleGrab grabber = FindFirstObjectByType<TestSimpleGrab>();
-
-        if (debugLogs)
+        if (snapOnRelease && cachedGrabber != null)
         {
-            Debug.Log($"[ArmSplintSocket] Q pressed | newspaperDone={newspaperDone}, clothDone={clothDone}, itemInZone={(itemInZone ? itemInZone.name : "null")}, IsHoldingObject={(grabber != null && grabber.IsHoldingObject)}");
-        }
+            bool isHoldingNow = cachedGrabber.IsHoldingObject;
 
-        // 1. ไอเทมอยู่ใน Trigger Zone ตอนกด Q
-        if (itemInZone != null && IsTargetItem(itemInZone))
-        {
-            TrySnapItem(itemInZone, grabber);
-            return;
-        }
-
-        // 2. ไอเทมที่กำลังถืออยู่ (เช็กทั้งระยะของไอเทม และระยะของผู้เล่นถึงจุดสแนป)
-        if (grabber != null && grabber.IsHoldingObject)
-        {
-            Rigidbody[] rbs = FindObjectsByType<Rigidbody>(FindObjectsSortMode.None);
-            foreach (Rigidbody rb in rbs)
+            if (isHoldingNow)
             {
-                if (rb == null) continue;
-                GameObject candidate = ResolveItemObject(rb.gameObject);
-                if (!IsTargetItem(candidate)) continue;
-                if (!grabber.IsHolding(candidate.transform)) continue;
-
-                Transform refPoint = GetReferenceSnapPoint(candidate);
-                float itemDistSocket = Vector3.Distance(rb.position, transform.position);
-                float itemDistPoint = Vector3.Distance(rb.position, refPoint.position);
-                float playerDistSocket = playerRoot != null ? Vector3.Distance(playerRoot.position, transform.position) : float.MaxValue;
-                float playerDistPoint = playerRoot != null ? Vector3.Distance(playerRoot.position, refPoint.position) : float.MaxValue;
-
-                if (debugLogs)
+                Transform currentHeld = FindCurrentlyHeldTarget(cachedGrabber);
+                if (currentHeld != null)
                 {
-                    Debug.Log($"[ArmSplintSocket] Holding '{candidate.name}' | itemDist={Mathf.Min(itemDistSocket, itemDistPoint):F2}, playerDist={Mathf.Min(playerDistSocket, playerDistPoint):F2}, radius={releaseSnapRadius}");
-                }
-
-                if (itemDistSocket <= releaseSnapRadius ||
-                    itemDistPoint <= releaseSnapRadius ||
-                    playerDistSocket <= releaseSnapRadius ||
-                    playerDistPoint <= releaseSnapRadius)
-                {
-                    TrySnapItem(candidate, grabber);
-                    return;
+                    heldItemLastFrame = currentHeld;
                 }
             }
+            else if (wasHoldingLastFrame && heldItemLastFrame != null)
+            {
+                GameObject releasedObj = ResolveItemObject(heldItemLastFrame.gameObject);
+                heldItemLastFrame = null;
+
+                if (IsTargetItem(releasedObj) && IsWithinSnapRange(releasedObj))
+                {
+                    if (debugLogs)
+                        Debug.Log($"[ArmSplintSocket] Auto-snapped '{releasedObj.name}' on release!");
+
+                    TrySnapItem(releasedObj, cachedGrabber);
+                }
+            }
+
+            wasHoldingLastFrame = isHoldingNow;
         }
 
-        // 3. กรณีเพิ่งกด Q ปล่อยของไปแล้ว (IsHoldingObject = False) แต่อยู่ใกล้จุดสแนปหรือผู้เล่นเดินอยู่ใกล้
+        if (Input.GetKeyDown(releaseKey))
+        {
+            HandleManualSnap();
+        }
+    }
+
+    private Transform FindCurrentlyHeldTarget(TestSimpleGrab grabber)
+    {
+        Rigidbody[] rbs = FindObjectsByType<Rigidbody>(FindObjectsSortMode.None);
+        foreach (Rigidbody rb in rbs)
+        {
+            if (rb == null) continue;
+            if (grabber.IsHolding(rb.transform))
+            {
+                GameObject candidate = ResolveItemObject(rb.gameObject);
+                if (IsTargetItem(candidate))
+                    return rb.transform;
+            }
+        }
+        return null;
+    }
+
+    private bool IsWithinSnapRange(GameObject candidate)
+    {
+        if (candidate == null) return false;
+        if (itemInZone == candidate) return true;
+
+        Transform refPoint = GetReferenceSnapPoint(candidate);
+        float distItemPoint = Vector3.Distance(candidate.transform.position, refPoint.position);
+        float distItemSocket = Vector3.Distance(candidate.transform.position, transform.position);
+        float distPlayerPoint = playerRoot != null
+            ? Vector3.Distance(playerRoot.position, refPoint.position)
+            : float.MaxValue;
+
+        return distItemPoint <= releaseSnapRadius ||
+               distItemSocket <= releaseSnapRadius ||
+               distPlayerPoint <= releaseSnapRadius;
+    }
+
+    private void OnVRSnapPressed(InputAction.CallbackContext context)
+    {
+        HandleManualSnap();
+    }
+
+    private void HandleManualSnap()
+    {
+        if (cachedGrabber == null)
+            cachedGrabber = FindFirstObjectByType<TestSimpleGrab>();
+
+        if (itemInZone != null && IsTargetItem(itemInZone))
+        {
+            TrySnapItem(itemInZone, cachedGrabber);
+            return;
+        }
+
         Transform[] allTransforms = FindObjectsByType<Transform>(FindObjectsSortMode.None);
         foreach (Transform t in allTransforms)
         {
@@ -115,18 +229,9 @@ public class ArmSplintSocket : MonoBehaviour
             GameObject candidate = ResolveItemObject(t.gameObject);
             if (!IsTargetItem(candidate)) continue;
 
-            Transform refPoint = GetReferenceSnapPoint(candidate);
-            float distItemPoint = Vector3.Distance(candidate.transform.position, refPoint.position);
-            float distItemSocket = Vector3.Distance(candidate.transform.position, transform.position);
-            float distPlayerPoint = playerRoot != null ? Vector3.Distance(playerRoot.position, refPoint.position) : float.MaxValue;
-
-            if (distItemPoint <= releaseSnapRadius || distItemSocket <= releaseSnapRadius || distPlayerPoint <= releaseSnapRadius)
+            if (IsWithinSnapRange(candidate))
             {
-                if (debugLogs)
-                {
-                    Debug.Log($"[ArmSplintSocket] Fallback snap '{candidate.name}' | distItemPoint={distItemPoint:F2}, distPlayerPoint={distPlayerPoint:F2}");
-                }
-                TrySnapItem(candidate, grabber);
+                TrySnapItem(candidate, cachedGrabber);
                 return;
             }
         }
@@ -145,7 +250,7 @@ public class ArmSplintSocket : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other == null || other.isTrigger) return;
+        if (other == null) return;
         GameObject candidate = ResolveItemObject(other.gameObject);
         if (IsTargetItem(candidate))
         {
@@ -156,7 +261,7 @@ public class ArmSplintSocket : MonoBehaviour
 
     private void OnTriggerStay(Collider other)
     {
-        if (other == null || other.isTrigger) return;
+        if (other == null) return;
         GameObject candidate = ResolveItemObject(other.gameObject);
         if (IsTargetItem(candidate))
         {

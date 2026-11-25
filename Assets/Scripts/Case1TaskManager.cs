@@ -79,7 +79,7 @@ public class Case1TaskManager : MonoBehaviour
             case 2:
                 if (!task1AssessedArm)
                 {
-                    ShowWarning("Step 1 required: Press [E] on the injured arm to assess first!");
+                    ShowWarning("Step 1 required: Press [A] on the injured arm to assess first!");
                     return false;
                 }
                 if (task2NewspaperPlaced)
@@ -207,7 +207,7 @@ public class Case1TaskManager : MonoBehaviour
         string s4 = task4Called1669 ? "done" : (task3ClothWrapped ? "available" : "locked");
 
         taskListText.text =
-            $"1. Assess Injured Arm [E] - {s1}\n" +
+            $"1. Assess Injured Arm [A] - {s1}\n" +
             $"2. Place Newspaper Splint - {s2}\n" +
             $"3. Wrap Cloth to Splint - {s3}\n" +
             $"4. Call 1669 - {s4}";
