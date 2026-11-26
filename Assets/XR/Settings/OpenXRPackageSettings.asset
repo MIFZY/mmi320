@@ -689,10 +689,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9f0ebc320a151d3408ea1e9fce54d40e, type: 3}
   m_Name: OpenXRPackageSettings
   m_EditorClassIdentifier: Unity.XR.OpenXR.Editor::UnityEditor.XR.OpenXR.OpenXRPackageSettings
-  Keys: 0100000007000000
+  Keys: 01000000070000000d000000
   Values:
   - {fileID: 8798900796990072133}
   - {fileID: 3042018173557405006}
+  - {fileID: 9143212472414070009}
 --- !u!114 &277702958801778508
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1286,6 +1287,28 @@ MonoBehaviour:
   customRuntimeLoaderName: 
   cacheSize: 1048576
   perThreadCacheSize: 51200
+--- !u!114 &8615653237584028217
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b213d3e3c7f3109449eb46a4c8ee42f0, type: 3}
+  m_Name: XrPerformanceSettingsFeature WebGL
+  m_EditorClassIdentifier: Unity.XR.OpenXR::UnityEngine.XR.OpenXR.Features.Extensions.PerformanceSettings.XrPerformanceSettingsFeature
+  m_enabled: 0
+  nameUi: XR Performance Settings
+  version: 1.0.0
+  featureIdInternal: com.unity.openxr.feature.extension.performance_settings
+  openxrExtensionStrings: XR_EXT_performance_settings
+  company: Unity
+  priority: 0
+  targetOpenXRApiVersion: 
+  required: 0
+  customRuntimeLoaderName: 
 --- !u!114 &8798900796990072133
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1299,24 +1322,24 @@ MonoBehaviour:
   m_Name: Standalone
   m_EditorClassIdentifier: Unity.XR.OpenXR::UnityEngine.XR.OpenXR.OpenXRSettings
   features:
-  - {fileID: 7963667895776670562}
+  - {fileID: 277702958801778508}
   - {fileID: -9031081621175757163}
-  - {fileID: 6714977878982755107}
-  - {fileID: -2078968811956274056}
+  - {fileID: 1598269369275706372}
+  - {fileID: -4264605144361005701}
   - {fileID: 6964320361337950464}
-  - {fileID: 7424794928391716641}
-  - {fileID: 9059303601087349080}
-  - {fileID: -8826753777544319987}
-  - {fileID: 7721065460287444409}
-  - {fileID: 6889683918772384477}
+  - {fileID: -4075021272130137956}
+  - {fileID: 8962129926076719181}
+  - {fileID: -8839897966376443097}
+  - {fileID: -6488787214207425467}
+  - {fileID: -7748687134283944236}
   - {fileID: 7648214680078358356}
   - {fileID: 7477829347427342080}
   - {fileID: -2383572614005334381}
   - {fileID: -2840246490069040726}
   - {fileID: 5089443729576426617}
   - {fileID: -6915386437650002150}
-  - {fileID: 4122794108599952741}
-  - {fileID: 7709597420838573203}
+  - {fileID: 2691064548643645378}
+  - {fileID: 6173936898936077747}
   - {fileID: 8432397386114743879}
   - {fileID: 8012901849717748253}
   - {fileID: -8778761934139969608}
@@ -1379,3 +1402,32 @@ MonoBehaviour:
   targetOpenXRApiVersion: 
   required: 0
   customRuntimeLoaderName: 
+--- !u!114 &9143212472414070009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b5a1f07dc5afe854f9f12a4194aca3fb, type: 3}
+  m_Name: WebGL
+  m_EditorClassIdentifier: Unity.XR.OpenXR::UnityEngine.XR.OpenXR.OpenXRSettings
+  features:
+  - {fileID: 8615653237584028217}
+  customLoaderName: 
+  m_renderMode: 1
+  m_latencyOptimization: 0
+  m_autoColorSubmissionMode: 1
+  m_colorSubmissionModes:
+    m_List: 00000000
+  m_depthSubmissionMode: 0
+  m_spacewarpMotionVectorTextureFormat: 0
+  m_optimizeBufferDiscards: 0
+  m_symmetricProjection: 0
+  m_optimizeMultiviewRenderRegions: 0
+  m_multiviewRenderRegionsOptimizationMode: 0
+  m_hasMigratedMultiviewRenderRegionSetting: 1
+  m_foveatedRenderingApi: 1
+  m_useOpenXRPredictedTime: 1

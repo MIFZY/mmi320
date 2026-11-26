@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Events;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 public class GasStoveController : MonoBehaviour
 {
@@ -28,10 +30,15 @@ public class GasStoveController : MonoBehaviour
     public UnityEvent<string> onStatusMessage;
 
     private Camera cam;
+    private XRSimpleInteractable controllerInteractable;
 
     private void Start()
     {
         cam = Camera.main;
+
+        controllerInteractable = GetComponent<XRSimpleInteractable>();
+        if (controllerInteractable != null)
+            controllerInteractable.activated.AddListener(OnControllerActivated);
 
         if (taskManager == null)
         {
@@ -56,6 +63,17 @@ public class GasStoveController : MonoBehaviour
         {
             stoveFireAudio.ToggleFireSound(isGasOn);
         }
+    }
+
+    private void OnDestroy()
+    {
+        if (controllerInteractable != null)
+            controllerInteractable.activated.RemoveListener(OnControllerActivated);
+    }
+
+    private void OnControllerActivated(ActivateEventArgs args)
+    {
+        TurnOffGas();
     }
 
     private void Update()
