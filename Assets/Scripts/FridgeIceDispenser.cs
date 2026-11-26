@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Events;
+using UnityEngine.XR.Interaction.Toolkit;
+using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
 public class FridgeIceDispenser : MonoBehaviour
 {
@@ -32,11 +34,16 @@ public class FridgeIceDispenser : MonoBehaviour
     public UnityEvent<string> onStatusMessage;
 
     private Camera cam;
+    private XRSimpleInteractable controllerInteractable;
     private bool hasIce = false;
 
     private void Start()
     {
         cam = Camera.main;
+
+        controllerInteractable = GetComponent<XRSimpleInteractable>();
+        if (controllerInteractable != null)
+            controllerInteractable.activated.AddListener(OnControllerActivated);
 
         if (taskManager == null)
         {
@@ -57,6 +64,17 @@ public class FridgeIceDispenser : MonoBehaviour
 
         if (iceContainerSocket != null)
             iceContainerSocket.SetActive(false);
+    }
+
+    private void OnDestroy()
+    {
+        if (controllerInteractable != null)
+            controllerInteractable.activated.RemoveListener(OnControllerActivated);
+    }
+
+    private void OnControllerActivated(ActivateEventArgs args)
+    {
+        FillIce();
     }
 
     private void Update()

@@ -167,6 +167,16 @@ public class Case1TaskManager : MonoBehaviour
         RefreshTaskUI();
         onTask4Completed?.Invoke();
         onAllTasksCompleted?.Invoke();
+
+        if (CaseQuizSystem.Instance != null)
+        {
+            CaseQuizSystem.Instance.StartArmFractureQuiz();
+        }
+        else
+        {
+            Debug.LogWarning("[Case1TaskManager] CaseQuizSystem.Instance not found in scene.");
+        }
+
         return true;
     }
 

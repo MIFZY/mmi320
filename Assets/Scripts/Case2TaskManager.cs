@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
 using TMPro;
@@ -36,9 +37,19 @@ public class Case2TaskManager : MonoBehaviour
     [Tooltip("ล็อคให้โทร 1669 (Step 6) เป็นขั้นตอนสุดท้ายหลัง Step 1-5 ครบ")]
     public bool lockStep6Last = true;
 
+    [Header("Quiz Trigger Settings")]
+    [Tooltip("เริ่ม Quiz ของ Case 2 อัตโนมัติเมื่อทำครบ 6 ขั้นตอน")]
+    public bool triggerQuizOnComplete = true;
+
+    [Tooltip("หน่วงเวลาก่อนเปิด Quiz (วินาที) เช่น 0.5 - 1.0 วินาที หรือตั้งเป็น 0 ให้ขึ้นทันที")]
+    [Min(0f)]
+    public float quizStartDelay = 0.5f;
+
     [Header("Events")]
     public UnityEvent onAllTasksCompleted;
     public UnityEvent<string> onBlockedActionMessage;
+
+    private bool quizTriggered = false;
 
     public bool IsStep1SafetyDone => step1SafetyDone;
 
@@ -182,6 +193,29 @@ public class Case2TaskManager : MonoBehaviour
         step6Called1669Done = true;
         RefreshUI();
         onAllTasksCompleted?.Invoke();
+
+        if (triggerQuizOnComplete && !quizTriggered)
+        {
+            quizTriggered = true;
+            StartCoroutine(StartCase2QuizRoutine());
+        }
+    }
+
+    private IEnumerator StartCase2QuizRoutine()
+    {
+        if (quizStartDelay > 0f)
+        {
+            yield return new WaitForSeconds(quizStartDelay);
+        }
+
+        if (CaseQuizSystem.Instance != null)
+        {
+            CaseQuizSystem.Instance.StartFingerAmputationQuiz();
+        }
+        else
+        {
+            Debug.LogWarning("[Case2TaskManager] CaseQuizSystem.Instance not found in scene.");
+        }
     }
 
     public void RefreshUI()
